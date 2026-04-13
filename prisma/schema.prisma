@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  LEADER
+  MEMBER
+  TEACHER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  displayName  String
+  passwordHash String
+  role         UserRole     @default(MEMBER)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  ledTeams     Team[]       @relation("TeamLeader")
+  teams        TeamMember[]
+  assignedTask Task[]       @relation("TaskAssignee")
+  createdTask  Task[]       @relation("TaskCreator")
+  sessions     Session[]
+  scores       Score[]      @relation("ScoreTeacher")
+  inviteCodes  InviteCode[] @relation("InviteCodeCreator")
+  announcements Announcement[]
+  uploadedFiles TeamFile[]   @relation("TeamFileUploader")
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  leaderId    String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  leader      User         @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: Restrict)
+  members     TeamMember[]
+  tasks       Task[]
+  scores      Score[]
+  inviteCodes InviteCode[]
+  files       TeamFile[]
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model InviteCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  teamId      String
+  createdById String
+  isActive    Boolean   @default(true)
+  maxUses     Int       @default(200)
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  team        Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("InviteCodeCreator", fields: [createdById], references: [id], onDelete: Restrict)
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  teamId      String
+  title       String
+  description String?
+  objective   String?
+  acceptanceCriteria String?
+  nextActions String?
+  risks       String?
+  deliverables String?
+  collaborationNote String?
+  priority    String?
+  status      TaskStatus @default(TODO)
+  assigneeId  String?
+  creatorId   String
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  team        Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator     User       @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+}
+
+model Score {
+  id                String   @id @default(cuid())
+  teamId            String
+  teacherId         String
+  businessPlanScore Int
+  defenseScore      Int
+  bonusScore        Int
+  comment           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  team              Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teacher           User     @relation("ScoreTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, teacherId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model TeamFile {
+  id           String   @id @default(cuid())
+  teamId       String
+  uploaderId   String
+  originalName String
+  storedName   String
+  mimeType     String?
+  size         Int
+  relativePath String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  uploader     User     @relation("TeamFileUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, createdAt])
+}
