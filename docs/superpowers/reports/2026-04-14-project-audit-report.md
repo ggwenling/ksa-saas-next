@@ -196,6 +196,17 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Likely impact: Disk usage grows over time; users may see inconsistent file state; operators must do manual cleanup.
 - Recommended repair direction: Add compensating cleanup (delete the file if DB insert fails), and make delete best-effort but observably safe (structured logs/metrics for unlink errors, optionally unlink-before-delete if you can tolerate "file missing" while DB row exists). Consider adding a periodic reconcile/cleanup job.
 
+### Team file path resolution does not guard against `..` segments, so a corrupted `relativePath` could escape the intended storage root
+
+- Severity: `P3`
+- Module: `storage` + `api/files`
+- Location: `src/lib/storage/team-files.ts`, `src/app/api/teams/[teamId]/files/[fileId]/download/route.ts`
+- Observed issue: `getTeamFileAbsolutePath(relativePath)` normalizes path separators but does not reject `..` segments or enforce that the final resolved path stays within `STORAGE_ROOT`. The download route trusts `row.relativePath` from the DB and passes it directly into `getTeamFileAbsolutePath`.
+- Evidence: `getTeamFileAbsolutePath()` uses `path.join(STORAGE_ROOT, normalized)` without validating traversal segments (`src/lib/storage/team-files.ts` lines 37-39). Download resolves `absPath = getTeamFileAbsolutePath(row.relativePath)` and then reads it (`src/app/api/teams/[teamId]/files/[fileId]/download/route.ts` lines 39-43).
+- Why it matters: While the app writes `relativePath` itself today, any DB corruption/migration mistake (or future bug that allows writing arbitrary `relativePath`) could turn file download/delete into unintended local file access.
+- Likely impact: Potential information disclosure of local server files if `relativePath` becomes attacker-controlled; harder to reason about filesystem safety invariants over time.
+- Recommended repair direction: Enforce that `relativePath` is a safe, normalized, storage-internal path (reject `..`, absolute paths, and drive letters) and verify `path.resolve(absPath)` remains under `STORAGE_ROOT` before reading/unlinking.
+
 ### Task detail templating uses broad keyword matching and lacks coverage for ambiguous titles, which can produce incorrect guidance content
 
 - Severity: `P3`
@@ -218,9 +229,18 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Likely impact: Increased probability of user-visible failures in task/team flows and more brittle frontend-backend integration.
 - Recommended repair direction: Add a small set of schema-focused tests for `task.ts` and `team.ts`, especially around empty strings, nulls, and due date parsing expectations.
 
+### API route review coverage notes (Task 4 addendum)
+
+- Reviewed `src/app/api/auth/me/route.ts` (GET): simple session-backed identity endpoint returning `401` when `getCurrentUser()` is null and `200` with `{ data: user }` otherwise; no additional issues beyond the existing `getCurrentUser()` / `user.isActive` finding already recorded.
+- Reviewed `src/app/api/announcements/route.ts` (GET/POST): requires auth, uses `canPublishAnnouncement()` for role gating, validates with `announcementSchema`, and returns `201` on create; no additional material issues found.
+- Reviewed `src/app/api/scores/route.ts` (GET/POST): TEACHER-only via `requireRole(...)`, validates payload with `scoreSchema`, and uses `upsert`; no additional material issues found.
+- Reviewed `src/app/api/teams/[teamId]/members/route.ts` (GET): requires auth + `requireTeamAccess(..., { allowTeacher: true })` and returns selected user fields; no additional material issues found.
+- Reviewed `src/app/api/teams/[teamId]/files/[fileId]/download/route.ts` (GET): requires auth + `requireTeamAccess(..., { allowTeacher: true })`, reads from filesystem, and sets `Content-Disposition` for attachment; see the `relativePath` hardening finding above.
+
 ## Bug Risks
 
 - Task create/update flows can accept `assigneeId: ""` (common from HTML forms), bypass membership validation, and fail later as a Prisma foreign key error, turning a 400 into an intermittent 500.
+- If `TeamFile.relativePath` becomes corrupted or attacker-controlled, the download/delete flows can access files outside the intended storage directory because path traversal segments are not explicitly rejected.
 
 ## Test Gaps
 
