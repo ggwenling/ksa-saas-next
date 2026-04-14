@@ -14,7 +14,7 @@
 - The audit design spec enumerates a full-project read-only review covering auth, dashboard, teams, tasks, files, announcements, scores, profile, Prisma wiring, APIs, and tests, with verification commands and developer-facing output.
 - `prisma/schema.prisma` targets SQLite and models users, teams, tasks, scores, announcements, sessions, invite codes, and team files with cascades plus enums for `UserRole` and `TaskStatus`.
 - `rg --files src prisma docs/superpowers` confirms the source layout: lib auth/dashboard/domain utilities, API route hierarchy (`app/api/...`), components, providers, CSS, Prisma migrations, and audit docs/scripts.
-- `git log --oneline -5` shows: `4080f08 docs: fix audit report inventory`, `f2d876c docs: add baseline inventory summary`, `f3aa064 docs: scaffold project audit report`, `34319c3 docs: add audit execution plan`, `9827696 docs: add project audit design spec`.
+- At baseline capture time, `git log --oneline -5` was dominated by the audit report scaffold/inventory chain on top of the earlier plan and design docs commits.
 
 ## Findings
 
