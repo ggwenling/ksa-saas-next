@@ -237,6 +237,50 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Reviewed `src/app/api/teams/[teamId]/members/route.ts` (GET): requires auth + `requireTeamAccess(..., { allowTeacher: true })` and returns selected user fields; no additional material issues found.
 - Reviewed `src/app/api/teams/[teamId]/files/[fileId]/download/route.ts` (GET): requires auth + `requireTeamAccess(..., { allowTeacher: true })`, reads from filesystem, and sets `Content-Disposition` for attachment; see the `relativePath` hardening finding above.
 
+### Dashboard shell navigation selection and layout constraints create cross-page UX inconsistencies (nav highlight, mobile clipping risk)
+
+- Severity: `P2`
+- Module: `dashboard-shell`
+- Location: `src/components/layout/dashboard-shell.tsx`
+- Observed issue: Menu selection forces `/files` highlight for any route containing `/files` (including team-level `/teams/:teamId/files`), the sider content uses a fixed `h-[800px] min-h-[800px]` container without an explicit scroll strategy, the extra "Navigation" info panel renders a visible header but an empty body, and logout shows a success toast + redirect without checking request success.
+- Evidence: Selection logic `if (pathname.includes("/files")) return ["/files"];`; fixed-height sider container `className="... h-[800px] min-h-[800px] ..."`; empty panel body in the "Navigation" card (a `<Typography.Text ...>` with no children); logout click handler `await fetch(...); message.success("已退出登录"); router.push("/login");` (no `res.ok` handling).
+- Why it matters: These issues affect every dashboard page (global shell), and they compound on mobile or in deep team routes where users rely on stable navigation cues.
+- Likely impact: Users see inconsistent active navigation state (especially on team files pages), may lose access to part of the nav on smaller screens, and may receive incorrect success feedback on logout failures.
+- Recommended repair direction: Align selection logic to the dashboard IA (do not special-case on substring), remove fixed-height constraints or add intentional scroll behavior, remove/fill the empty info panel, and handle logout failure paths (check `res.ok`, show error state, and avoid redirect on failure).
+
+### Dashboard pages rely on toast-only error feedback and have inconsistent/fragile async interaction states (missing catch, no retry, no mutation feedback)
+
+- Severity: `P2`
+- Module: `dashboard-pages`
+- Location: `src/app/(dashboard)/files/page.tsx`, `src/app/(dashboard)/teams/[teamId]/board/page.tsx`, `src/app/(dashboard)/teams/[teamId]/files/page.tsx`
+- Observed issue: Several pages rely on toast-only error feedback and/or silently return on failed requests, while some mutation flows lack `try/catch` and per-action progress/disabled states; task status changes on the board refresh data without success confirmation, which can feel like the action was ignored on slow connections.
+- Evidence: `FilesEntryPage` (`/files`) `fetchTeams()` uses `try/finally` but no `catch` and returns early on `!res.ok` without an error message; team board `updateStatus()` and `deleteTask()` perform fetches without `try/catch` and provide no success feedback for status changes; team files `deleteFile()` performs a fetch without `try/catch` and has no per-row progress/disabled state during delete.
+- Why it matters: When fetches fail, users need deterministic, visible states (inline error + retry), not "empty list" ambiguity. For mutations, action feedback and disabled states prevent duplicate operations and confusion.
+- Likely impact: Users misinterpret errors as "no data", retry by clicking repeatedly, and have lower trust in state changes (especially on the task board).
+- Recommended repair direction: Standardize on per-page `loading / empty / error` views (not toast-only), add retry affordances, and wrap all async mutations in `try/catch` with disabled/progress UI and explicit success messaging where appropriate.
+
+### Profile page displays hardcoded identity data (not derived from the logged-in session)
+
+- Severity: `P1`
+- Module: `profile`
+- Location: `src/app/(dashboard)/profile/page.tsx`
+- Observed issue: The profile UI renders fixed identity values (e.g. display name, username, role, join date) rather than loading the current user from session-backed data.
+- Evidence: The page body contains literal values such as `张三`, `leader01`, `队长`, and `2026-04-10`.
+- Why it matters: This page is explicitly about account identity. Showing incorrect identity data is a high-trust UX failure and can mislead users about permissions and which account is active.
+- Likely impact: Every user sees the same profile content, causing confusion and increasing support burden ("wrong account" / "wrong role").
+- Recommended repair direction: Fetch identity from a session-backed endpoint (e.g. `/api/auth/me`) or render as a server component using the same auth utilities used elsewhere; ensure role/team labels come from real associations.
+
+### Encoding and string-garbling confirmation (dashboard scope)
+
+- Severity: `P3`
+- Module: `dashboard/strings`
+- Location: `src/components/layout/dashboard-shell.tsx`, `src/app/(dashboard)/**`
+- Observed issue: No high-priority string garbling was found in the dashboard shell/pages when files are interpreted as UTF-8; mojibake-style output during audit can be reproduced by reading UTF-8 source files with a non-UTF-8 default decoder (for example PowerShell `Get-Content` without `-Encoding utf8`).
+- Evidence: Searching for common garbling indicators (replacement character `�`, smart-quote artifacts, or mojibake sequences) in the dashboard shell/pages produced no matches; file content renders correctly when interpreted as UTF-8.
+- Why it matters: Garbled UI strings are a high-severity UX issue when present, and encoding mismatches can also mislead code review and audits if the toolchain is not consistently UTF-8.
+- Likely impact: End-user UI should not be impacted by this finding; the risk is primarily developer-facing (review/edit mistakes if files are opened/saved with the wrong encoding).
+- Recommended repair direction: Ensure editors and review tooling treat the repo as UTF-8 (and avoid tools/settings that default to legacy code pages).
+
 ## Bug Risks
 
 - Task create/update flows can accept `assigneeId: ""` (common from HTML forms), bypass membership validation, and fail later as a Prisma foreign key error, turning a 400 into an intermittent 500.
@@ -245,6 +289,14 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 ## Test Gaps
 
 ## UX Issues
+
+- Dashboard nav highlight can be misleading on team file routes (`/teams/:teamId/files`), because the shell forces `/files` as the selected menu item for any pathname containing `/files`.
+- Dashboard sider content is fixed-height (`800px`) without a clear scroll strategy, increasing the chance of clipped navigation on shorter viewports.
+- The dashboard shell renders a "Navigation" info card with an empty body, which reads as an unfinished/broken UI element.
+- Logout shows a success toast and redirects without checking logout API success, so failures can be masked as successful sign-outs.
+- `/files` team-selection page silently treats API failures as "no accessible teams" (no `catch`, no error UI, no retry).
+- Team board and team file mutations have inconsistent interaction feedback (no progress/disabled states for PATCH/DELETE; status changes refresh silently).
+- Profile page currently shows hardcoded user identity values instead of the logged-in session’s real account data.
 
 ## Structural Issues
 
