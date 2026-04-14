@@ -27,4 +27,10 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 
 ## Build And Runtime Risks
 
+### Verification Results
+
+- `npm run lint`: pass; ESLint exited 0 with no output, so there were no lint policy violations observed.
+- `npm run test`: pass; `vitest run` reported 4 files and 23 tests successful with no failures, and there were no indications of harness issues.
+- `npm run build`: fail; `next build` compiled successfully but aborts while collecting data for `/api/teams/[teamId]/members` because `DATABASE_URL is required`, leaving the production build blocked until the environment variable is provided or the data access path is mocked.
+
 ## Suggested Repair Order
