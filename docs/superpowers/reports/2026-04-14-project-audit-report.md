@@ -270,13 +270,18 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Likely impact: Every user sees the same profile content, causing confusion and increasing support burden ("wrong account" / "wrong role").
 - Recommended repair direction: Fetch identity from a session-backed endpoint (e.g. `/api/auth/me`) or render as a server component using the same auth utilities used elsewhere; ensure role/team labels come from real associations.
 
+### Shared shell/providers/global styling review notes (Task 5 addendum)
+
+- Reviewed `src/app/layout.tsx`, `src/components/providers/app-provider.tsx`, and `src/app/globals.css`: the shared App provider wires Ant Design `ConfigProvider` with a consistent token palette and zh-CN locale, and global styling establishes the repo-wide "glass" look; no additional material UX/interaction issues found beyond the dashboard-shell/page findings already recorded.
+- Note: These files contain Chinese UI strings and font names. They render correctly when interpreted as UTF-8, but can appear mojibake-garbled during review if tools default to a non-UTF-8 decoder (see encoding confirmation below).
+
 ### Encoding and string-garbling confirmation (dashboard scope)
 
 - Severity: `P3`
 - Module: `dashboard/strings`
-- Location: `src/components/layout/dashboard-shell.tsx`, `src/app/(dashboard)/**`
+- Location: `src/components/layout/dashboard-shell.tsx`, `src/app/(dashboard)/**`, `src/app/layout.tsx`, `src/app/globals.css`
 - Observed issue: No high-priority string garbling was found in the dashboard shell/pages when files are interpreted as UTF-8; mojibake-style output during audit can be reproduced by reading UTF-8 source files with a non-UTF-8 default decoder (for example PowerShell `Get-Content` without `-Encoding utf8`).
-- Evidence: Searching for common garbling indicators (replacement character `�`, smart-quote artifacts, or mojibake sequences) in the dashboard shell/pages produced no matches; file content renders correctly when interpreted as UTF-8.
+- Evidence: Searching for common garbling indicators (replacement character `�`, smart-quote artifacts, or mojibake sequences) in the dashboard shell/pages produced no matches; additionally, `src/app/layout.tsx` metadata strings and `src/app/globals.css` font `local(...)` names render correctly when interpreted as UTF-8 but appear garbled when reviewed with a non-UTF-8 decoder.
 - Why it matters: Garbled UI strings are a high-severity UX issue when present, and encoding mismatches can also mislead code review and audits if the toolchain is not consistently UTF-8.
 - Likely impact: End-user UI should not be impacted by this finding; the risk is primarily developer-facing (review/edit mistakes if files are opened/saved with the wrong encoding).
 - Recommended repair direction: Ensure editors and review tooling treat the repo as UTF-8 (and avoid tools/settings that default to legacy code pages).
@@ -296,7 +301,7 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Logout shows a success toast and redirects without checking logout API success, so failures can be masked as successful sign-outs.
 - `/files` team-selection page silently treats API failures as "no accessible teams" (no `catch`, no error UI, no retry).
 - Team board and team file mutations have inconsistent interaction feedback (no progress/disabled states for PATCH/DELETE; status changes refresh silently).
-- Profile page currently shows hardcoded user identity values instead of the logged-in session’s real account data.
+- Profile page currently shows hardcoded user identity values instead of the logged-in session's real account data.
 
 ## Structural Issues
 
