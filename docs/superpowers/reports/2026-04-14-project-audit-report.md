@@ -224,7 +224,7 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Module: `tests/coverage`
 - Location: `src/lib/**/__tests__/*.test.ts`, `src/app/api/**`, `package.json`
 - Observed issue: The current automated test surface focuses on pure functions (auth validation + password helpers, domain rules/formatting, and dashboard presenters). There are no tests that execute `src/app/api/**` route handlers, Prisma-backed flows, or dashboard page/component UX.
-- Evidence: `rg --files src | rg __tests__` returns only 4 test files (`src/lib/auth/__tests__/validation.test.ts`, `src/lib/domain/__tests__/rules.test.ts`, `src/lib/domain/__tests__/task-detail.test.ts`, `src/lib/dashboard/__tests__/presenters.test.ts`). `npm run test` runs `vitest run` and reports `Test Files 4 passed (4)` / `Tests 23 passed (23)`.
+- Evidence: Repo-wide scan for test files (`rg --files | rg '\\.(test|spec)\\.(ts|tsx|js|jsx)$'`) returned 4 suites, all under `src/lib/` (`src/lib/auth/__tests__/validation.test.ts`, `src/lib/domain/__tests__/rules.test.ts`, `src/lib/domain/__tests__/task-detail.test.ts`, `src/lib/dashboard/__tests__/presenters.test.ts`). `npm run test` runs `vitest run` and reports `Test Files 4 passed (4)` / `Tests 23 passed (23)`.
 - Why it matters: Most audited subsystems are implemented in API routes + Prisma queries (auth/session, role gating, CRUD for tasks/files/announcements/scores). Without integration tests, regressions in those areas will not be caught by the current test suite.
 - Likely impact: Higher defect escape rate; runtime-only failures in common workflows (login/logout/session persistence, task mutations, file upload/delete, scoring and announcements).
 - Recommended repair direction: Add a small number of API-route integration tests using a dedicated SQLite test database (or Prisma-backed fixtures) covering auth/session lifecycle, role-based access control, and at least one happy-path + one error-path per CRUD subsystem. Consider a minimal E2E smoke test for dashboard navigation and the top-level flows.
@@ -234,7 +234,7 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Severity: `P2`
 - Module: `verification`
 - Location: `package.json` scripts, `npm run test`, `npm run build`
-- Observed issue: The repo defines `lint`, `test`, and `build`, but there is no consolidated verification script (for example `verify`/`ci`) and no scripted baseline for build prerequisites (environment variables / DB connectivity). As a result, unit tests can pass while production build remains broken.
+- Observed issue: The repo defines `lint`, `test`, and `build`, but there is no consolidated verification script (for example `verify`/`ci`) and no scripted baseline for build prerequisites (environment variables such as `DATABASE_URL`). As a result, unit tests can pass while production build remains broken.
 - Evidence: `package.json` defines `test: vitest run` and has no `typecheck`/`verify` script. In this audit, `npm run test` passed while `npm run build` failed due to missing `DATABASE_URL` (see `## Build And Runtime Risks`).
 - Why it matters: Teams often rely on `npm test` (or a CI “tests only” job) as a quality gate. If build prerequisites are not validated in automation, deployment-breaking issues are discovered late.
 - Likely impact: Broken production builds / blocked deployments despite “green tests”; higher cycle time when build failures are discovered after code review or at release time.
@@ -317,6 +317,7 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 
 - No automated tests for `src/app/api/**` route handlers (auth/session, teams/tasks/files/announcements/scores) executing against Prisma/SQLite.
 - No tests validating session lifecycle behavior (cookie issuance/clearing, session persistence/expiry, role gating via `requireRole`/`requireTeamAccess`).
+- No schema-boundary tests for `createTeamSchema` / `createTaskSchema` / `updateTaskSchema` (empty strings, null vs omitted, due date parsing).
 - No tests exercising dashboard pages/components; current coverage stops at presenters and pure helper functions.
 - No automated “build gate” coverage validating production build prerequisites (for example a `verify` job/script that runs `next build` with required env like `DATABASE_URL`).
 
