@@ -29,8 +29,27 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 
 ### Verification Results
 
-- `npm run lint`: pass; ESLint exited 0 with no output, so there were no lint policy violations observed.
-- `npm run test`: pass; `vitest run` reported 4 files and 23 tests successful with no failures, and there were no indications of harness issues.
-- `npm run build`: fail; `next build` compiled successfully but aborts while collecting data for `/api/teams/[teamId]/members` because `DATABASE_URL is required`, leaving the production build blocked until the environment variable is provided or the data access path is mocked.
+- `npm run lint`: pass; ESLint exited 0 again, confirming there were no lint policy violations.
+  ```
+  > kas-saas-next@0.1.0 lint
+  > eslint
+  ```
+- `npm run test`: pass; `vitest run` completed with all suites passing, so there are no failing tests or harness issues.
+  ```
+  > kas-saas-next@0.1.0 test
+  > vitest run
+
+   Test Files  4 passed (4)
+        Tests  23 passed (23)
+  ```
+- `npm run build`: fail; `next build` compiles and runs TypeScript but halts during page-data collection because `DATABASE_URL is required`, blocking the production build until the environment variable is supplied or the affected route is mocked.
+  ```
+  > kas-saas-next@0.1.0 build
+  > next build
+
+  Error: DATABASE_URL is required
+  ...
+  Error: Failed to collect page data for /api/auth/logout
+  ```
 
 ## Suggested Repair Order
