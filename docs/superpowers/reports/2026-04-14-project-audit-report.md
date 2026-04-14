@@ -1,7 +1,5 @@
 # 2026-04-14 Project Audit Report
 
-# 2026-04-14 Project Audit Report
-
 ## Health Overview
 
 - Repository snapshot: Next.js app with auth, dashboard, teams, tasks, files, announcements, scores, and profile flows.
@@ -16,7 +14,7 @@
 - The audit design spec enumerates a full-project read-only review covering auth, dashboard, teams, tasks, files, announcements, scores, profile, Prisma wiring, APIs, and tests, with verification commands and developer-facing output.
 - `prisma/schema.prisma` targets SQLite and models users, teams, tasks, scores, announcements, sessions, invite codes, and team files with cascades plus enums for `UserRole` and `TaskStatus`.
 - `rg --files src prisma docs/superpowers` confirms the source layout: lib auth/dashboard/domain utilities, API route hierarchy (`app/api/...`), components, providers, CSS, Prisma migrations, and audit docs/scripts.
-- `git log --oneline -5` shows the two latest docs commits (audit plan and design) plus `fix:4.13` and the original Create Next App seed.
+- `git log --oneline -5` shows: `34319c3 docs: add audit execution plan`, `9827696 docs: add project audit design spec`, `aa80bef fix:4.13`, and `de6d48a Initial commit from Create Next App`.
 
 ## Findings
 
