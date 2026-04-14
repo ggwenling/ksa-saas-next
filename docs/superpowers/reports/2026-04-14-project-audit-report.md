@@ -163,13 +163,72 @@ At baseline capture time, `git log --oneline -5` listed `b6e54d8 docs: describe 
 - Likely impact: Regressions can ship unnoticed (for example weaker cookie flags, broken logout, disabled users still authorized).
 - Recommended repair direction: Add minimal unit/integration tests around `createSession`/`setSessionCookie`/`getCurrentUser` and one API smoke test per auth route for expected status codes.
 
+### Task create/update schemas allow empty `assigneeId`, causing API handlers to accept invalid payloads and potentially throw 500s
+
+- Severity: `P1`
+- Module: `domain` + `api/tasks`
+- Location: `src/lib/domain/task.ts`, `src/app/api/teams/[teamId]/tasks/route.ts`, `src/app/api/teams/[teamId]/tasks/[taskId]/route.ts`
+- Observed issue: `assigneeId` is defined as `z.string().trim().optional().nullable()` (no `min(1)` or ID format check), so `assigneeId: ""` is a valid payload. Both create and update handlers gate membership validation with `if (parsed.data.assigneeId)`, so the empty-string case bypasses membership checks and can be written through to Prisma as an invalid foreign key value.
+- Evidence: In `src/lib/domain/task.ts`, `createTaskSchema.assigneeId` (line 20) and `updateTaskSchema.assigneeId` (line 34) accept an empty string. In `src/app/api/teams/[teamId]/tasks/route.ts`, the membership check is truthiness-based (line 73) but the create write uses `assigneeId: parsed.data.assigneeId ?? null` (line 98). In `src/app/api/teams/[teamId]/tasks/[taskId]/route.ts`, the membership check is also truthiness-based (line 37) while the update writes `assigneeId: parsed.data.assigneeId` (line 70).
+- Why it matters: Empty strings are a common "unset" value from HTML forms and UI state. This can turn a user input/validation problem into an intermittent 500 error (or silent data corruption if referential integrity is not enforced in some environments).
+- Likely impact: Task create/update can fail unexpectedly with server errors, or tasks can end up with invalid assignee references that break downstream queries and UI assumptions.
+- Recommended repair direction: Normalize empty strings to `null` before schema validation, add `min(1)` (or a real ID validator like `cuid`/`uuid` depending on the schema), and add tests covering `assigneeId: ""` plus membership mismatch.
+
+### Dashboard server composition duplicates API route query and shaping logic, increasing contract drift risk
+
+- Severity: `P3`
+- Module: `server/dashboard-data` + `api`
+- Location: `src/lib/server/dashboard-data.ts`, `src/lib/dashboard/presenters.ts`, `src/app/api/teams/route.ts`, `src/app/api/teams/[teamId]/files/route.ts`
+- Observed issue: The same "what to query" and "how to shape it" logic exists in two places: server-only dashboard data composition uses presenters, while API routes frequently re-implement mapping logic inline. This is already visible for team summary shaping (progress, member count, invite code hiding) and team file shaping (`canDelete`).
+- Evidence: `src/lib/server/dashboard-data.ts` returns teams via `presentTeamSummaries(...)` (lines 86-134) while `src/app/api/teams/route.ts` repeats the Prisma includes and maps to `{ progress, memberCount, inviteCode }` manually (lines 22-75). Similarly, `src/lib/server/dashboard-data.ts` returns files via `presentTeamFiles(...)` (lines 196-215) while `src/app/api/teams/[teamId]/files/route.ts` maps rows inline and computes `canDelete` directly (lines 27-52).
+- Why it matters: This is a classic source of "data contract drift", where one surface (server dashboard pages) changes while the other (API) lags behind, producing hard-to-debug UI inconsistencies and brittle client assumptions.
+- Likely impact: Future changes to permissions, derived fields, or serialization can ship partially, breaking some pages or API consumers while others look correct.
+- Recommended repair direction: Factor shared "query + present" functions (or at least shared presenter/serializer helpers) that are reused by both `dashboard-data` and API routes; add a small contract test suite that asserts stable fields for teams/files across both surfaces.
+
+### Team file upload/delete lacks transactional behavior across DB and filesystem, leading to orphaned files or dangling DB state on partial failures
+
+- Severity: `P2`
+- Module: `files` + `storage`
+- Location: `src/app/api/teams/[teamId]/files/route.ts`, `src/app/api/teams/[teamId]/files/[fileId]/route.ts`, `src/lib/storage/team-files.ts`
+- Observed issue: File writes and DB mutations are performed in separate steps without compensating cleanup. Upload writes the file first and then inserts the DB row; delete removes the DB row first and then unlinks the file.
+- Evidence: In `src/app/api/teams/[teamId]/files/route.ts`, the upload flow is `saveTeamFile(...)` (line 95) followed by `prisma.teamFile.create(...)` (line 97). In `src/app/api/teams/[teamId]/files/[fileId]/route.ts`, the delete flow is `prisma.teamFile.delete(...)` (line 52) followed by `removeTeamFile(...)` (line 53). Storage helpers in `src/lib/storage/team-files.ts` use `writeFile` (line 30) and `unlink` (line 45) with only `ENOENT` suppressed.
+- Why it matters: Partial failures are common in real deployments (transient DB errors, disk full, permission changes, antivirus locks). Without compensation, you accumulate orphaned files, or you end up with successful user-facing deletes that leave data behind, complicating moderation and storage management.
+- Likely impact: Disk usage grows over time; users may see inconsistent file state; operators must do manual cleanup.
+- Recommended repair direction: Add compensating cleanup (delete the file if DB insert fails), and make delete best-effort but observably safe (structured logs/metrics for unlink errors, optionally unlink-before-delete if you can tolerate "file missing" while DB row exists). Consider adding a periodic reconcile/cleanup job.
+
+### Task detail templating uses broad keyword matching and lacks coverage for ambiguous titles, which can produce incorrect guidance content
+
+- Severity: `P3`
+- Module: `domain/tasks`
+- Location: `src/lib/domain/task-detail.ts`
+- Observed issue: `resolveTemplate()` uses broad "contains any character in this set" regexes and fixed ordering to choose a template. Titles containing overlapping keywords can be routed to the first match, even when a later template is more relevant (for example a title containing both "市场" and "PPT/路演").
+- Evidence: `resolveTemplate()` checks `/[市调竞品市场]/` first (line 48), then `/[路演答辩演讲PPT讲稿]/` (line 73), then `/[分工角色团队]/` (line 98); there are no tests asserting behavior when titles contain multiple keyword groups.
+- Why it matters: This logic is user-facing (it shapes objective/criteria/next-actions). Wrong template selection can mislead teams and adds "why did it generate this" support burden.
+- Likely impact: Confusing or irrelevant default content in task detail views, especially as titles become more descriptive and include multiple concepts.
+- Recommended repair direction: Replace regex character-classes with explicit keyword arrays and deterministic selection (priority or scoring), and add a couple of tests for overlapping-keyword titles.
+
+### Domain unit coverage does not exercise task/team input validation boundaries, leaving common API edge cases untested
+
+- Severity: `P3`
+- Module: `domain/tests`
+- Location: `src/lib/domain/__tests__/rules.test.ts`, `src/lib/domain/__tests__/task-detail.test.ts`
+- Observed issue: Current domain tests cover `announcementSchema`, `scoreSchema`, `calculateTeamProgress`, `canDeleteTeamFile`, and a few `buildTaskDetail()` behaviors, but do not cover `createTeamSchema`, `createTaskSchema`, or `updateTaskSchema` boundary cases (including `assigneeId: ""`, `dueDate` format permutations, and nullable-vs-omitted field semantics).
+- Evidence: `src/lib/domain/__tests__/rules.test.ts` imports `announcementSchema`, `scoreSchema`, `calculateTeamProgress`, and `canDeleteTeamFile` only, with no task/team schema assertions.
+- Why it matters: The API layer trusts these schemas for validation. If schemas drift or allow unintended values, regressions will surface as production-only 400/500s rather than fast unit feedback.
+- Likely impact: Increased probability of user-visible failures in task/team flows and more brittle frontend-backend integration.
+- Recommended repair direction: Add a small set of schema-focused tests for `task.ts` and `team.ts`, especially around empty strings, nulls, and due date parsing expectations.
+
 ## Bug Risks
+
+- Task create/update flows can accept `assigneeId: ""` (common from HTML forms), bypass membership validation, and fail later as a Prisma foreign key error, turning a 400 into an intermittent 500.
 
 ## Test Gaps
 
 ## UX Issues
 
 ## Structural Issues
+
+- Server-only dashboard composition and API routes duplicate Prisma queries and derived-field shaping (teams/files/scores), increasing long-term "data contract drift" and maintenance overhead.
 
 ## Build And Runtime Risks
 
