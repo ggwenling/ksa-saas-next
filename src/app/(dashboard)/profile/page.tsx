@@ -1,10 +1,17 @@
-"use client";
-
 import { UserOutlined } from "@ant-design/icons";
-import { Avatar, Card, Descriptions, Space, Typography } from "antd";
+import { Avatar, Card, Descriptions, Space, Tag, Typography } from "antd";
 import { Reveal } from "@/components/ui/reveal";
+import { getProfilePageData } from "@/lib/server/dashboard-data";
 
-export default function ProfilePage() {
+const roleLabel = {
+  LEADER: "队长",
+  MEMBER: "队员",
+  TEACHER: "老师",
+} as const;
+
+export default async function ProfilePage() {
+  const { user } = await getProfilePageData();
+
   return (
     <Space orientation="vertical" size={20} className="w-full">
       <Reveal className="glass-panel glass-panel-strong rounded-[34px] px-6 py-6">
@@ -23,16 +30,18 @@ export default function ProfilePage() {
             <Avatar size={68} icon={<UserOutlined />} className="!bg-[#d9f1ee] !text-[#1d8b80]" />
             <div>
               <Typography.Title level={3} className="!mb-0">
-                张三
+                {user.displayName}
               </Typography.Title>
-              <Typography.Text className="soft-text">队长 / 智创小队</Typography.Text>
+              <div className="mt-1">
+                <Tag color="cyan">{roleLabel[user.role]}</Tag>
+              </div>
             </div>
           </div>
 
           <Descriptions column={1} bordered>
-            <Descriptions.Item label="账号">leader01</Descriptions.Item>
-            <Descriptions.Item label="角色">队长</Descriptions.Item>
-            <Descriptions.Item label="加入时间">2026-04-10</Descriptions.Item>
+            <Descriptions.Item label="账号">{user.username}</Descriptions.Item>
+            <Descriptions.Item label="角色">{roleLabel[user.role]}</Descriptions.Item>
+            <Descriptions.Item label="用户 ID">{user.id}</Descriptions.Item>
           </Descriptions>
         </Card>
       </Reveal>

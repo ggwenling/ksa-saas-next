@@ -81,3 +81,24 @@ export type TaskItem = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ProfileUser = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "TEACHER" | "LEADER" | "MEMBER";
+};
+
+export type DashboardFieldErrors = Record<string, string[] | undefined>;
+
+export type DashboardActionResult<T = undefined> =
+  | {
+      ok: true;
+      message: string;
+      data?: T;
+    }
+  | {
+      ok: false;
+      message: string;
+      errors?: DashboardFieldErrors;
+    };

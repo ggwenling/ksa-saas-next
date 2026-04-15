@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { requireTeamAccess } from "@/lib/auth/team-access";
 import { requireUser } from "@/lib/auth/current-user";
-import { canDeleteTeamFile } from "@/lib/domain/file";
+import { presentTeamFiles } from "@/lib/dashboard/presenters";
 import { prisma } from "@/lib/db/prisma";
 import { generateStoredName, saveTeamFile } from "@/lib/storage/team-files";
 
@@ -35,19 +35,7 @@ export async function GET(_: Request, context: Params) {
     });
 
     return NextResponse.json({
-      data: rows.map((row) => ({
-        id: row.id,
-        originalName: row.originalName,
-        size: row.size,
-        mimeType: row.mimeType,
-        createdAt: row.createdAt,
-        uploader: row.uploader,
-        canDelete: canDeleteTeamFile({
-          role: auth.user.role,
-          currentUserId: auth.user.id,
-          uploaderId: row.uploaderId,
-        }),
-      })),
+      data: presentTeamFiles(rows, auth.user),
     });
   } catch (error) {
     console.error("team.files.get error", error);
@@ -114,7 +102,7 @@ export async function POST(request: Request, context: Params) {
     return NextResponse.json(
       {
         message: "上传文件成功",
-        data: created,
+        data: presentTeamFiles([created], auth.user)[0],
       },
       { status: 201 },
     );

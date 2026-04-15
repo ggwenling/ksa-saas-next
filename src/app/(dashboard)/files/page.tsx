@@ -1,62 +1,28 @@
-"use client";
-
-import { Card, Empty, Space, Spin, Table, Tag, Typography } from "antd";
+import { Card, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 import { Reveal } from "@/components/ui/reveal";
+import type { TeamSummary } from "@/lib/dashboard/types";
+import { getFilesEntryPageData } from "@/lib/server/dashboard-data";
 
-type TeamCard = {
-  id: string;
-  name: string;
-  description: string | null;
-  progress: number;
-  memberCount: number;
-  inviteCode: string | null;
-};
+const columns: ColumnsType<TeamSummary> = [
+  { title: "团队名称", dataIndex: "name" },
+  {
+    title: "进度",
+    render: (_, row) => <Tag color="cyan">{row.progress}%</Tag>,
+  },
+  {
+    title: "成员数",
+    dataIndex: "memberCount",
+  },
+  {
+    title: "操作",
+    render: (_, row) => <Link href={`/teams/${row.id}/files`}>进入文件管理</Link>,
+  },
+];
 
-type TeamListResponse = {
-  data?: TeamCard[];
-  message?: string;
-};
-
-export default function FilesEntryPage() {
-  const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<TeamCard[]>([]);
-
-  const fetchTeams = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/teams", { cache: "no-store" });
-      const json = (await res.json()) as TeamListResponse;
-      if (!res.ok) {
-        return;
-      }
-      setRows(json.data ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchTeams();
-  }, [fetchTeams]);
-
-  const columns: ColumnsType<TeamCard> = [
-    { title: "团队名称", dataIndex: "name" },
-    {
-      title: "进度",
-      render: (_, row) => <Tag color="cyan">{row.progress}%</Tag>,
-    },
-    {
-      title: "成员数",
-      dataIndex: "memberCount",
-    },
-    {
-      title: "操作",
-      render: (_, row) => <Link href={`/teams/${row.id}/files`}>进入文件管理</Link>,
-    },
-  ];
+export default async function FilesEntryPage() {
+  const { teams } = await getFilesEntryPageData();
 
   return (
     <Space orientation="vertical" size={20} className="w-full">
@@ -72,14 +38,10 @@ export default function FilesEntryPage() {
 
       <Reveal delay={0.05}>
         <Card className="glass-panel rounded-[30px] !border-white/70 !bg-white/55">
-          {loading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Spin />
-            </div>
-          ) : rows.length === 0 ? (
+          {teams.length === 0 ? (
             <Empty description="暂无可访问团队" />
           ) : (
-            <Table rowKey="id" dataSource={rows} columns={columns} pagination={false} />
+            <Table rowKey="id" dataSource={teams} columns={columns} pagination={false} />
           )}
         </Card>
       </Reveal>

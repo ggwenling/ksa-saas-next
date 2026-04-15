@@ -3,6 +3,7 @@ import { canDeleteTeamFile } from "../domain/file";
 import type {
   AnnouncementRow,
   ScoreRow,
+  TaskItem,
   TeamFileRow,
   TeamSummary,
 } from "./types";
@@ -84,6 +85,46 @@ export function presentTeacherScores(rows: TeacherScoreSource[]): ScoreRow[] {
         : null,
     };
   });
+}
+
+type TaskItemSource = {
+  id: string;
+  title: string;
+  description: string | null;
+  objective: string | null;
+  acceptanceCriteria: string | null;
+  nextActions: string | null;
+  risks: string | null;
+  deliverables: string | null;
+  collaborationNote: string | null;
+  priority: string | null;
+  status: "TODO" | "IN_PROGRESS" | "DONE";
+  dueDate: Date | string | null;
+  assignee: TaskItem["assignee"];
+  creator: TaskItem["creator"];
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
+export function presentTaskItems(rows: TaskItemSource[]): TaskItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    objective: row.objective,
+    acceptanceCriteria: row.acceptanceCriteria,
+    nextActions: row.nextActions,
+    risks: row.risks,
+    deliverables: row.deliverables,
+    collaborationNote: row.collaborationNote,
+    priority: row.priority,
+    status: row.status,
+    dueDate: row.dueDate ? toIsoString(row.dueDate) : null,
+    assignee: row.assignee,
+    creator: row.creator,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
+  }));
 }
 
 type TeamFileSource = {
