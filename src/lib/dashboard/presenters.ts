@@ -2,6 +2,7 @@ import { calculateTeamProgress } from "../domain/progress";
 import { canDeleteTeamFile } from "../domain/file";
 import type {
   AnnouncementRow,
+  ProfileSummary,
   ScoreRow,
   TeamFileRow,
   TeamSummary,
@@ -113,4 +114,38 @@ export function presentTeamFiles(
       uploaderId: row.uploaderId,
     }),
   }));
+}
+
+type ProfileSource = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: ProfileSummary["role"];
+  createdAt: Date | string;
+  ledTeams: Array<{ name: string }>;
+  teams: Array<{ team: { name: string } }>;
+};
+
+const roleLabels: Record<ProfileSummary["role"], string> = {
+  LEADER: "队长",
+  MEMBER: "队员",
+  TEACHER: "老师",
+};
+
+export function presentProfile(row: ProfileSource): ProfileSummary {
+  const createdAt = toIsoString(row.createdAt).slice(0, 10);
+  const primaryTeam =
+    row.ledTeams[0]?.name ??
+    row.teams[0]?.team.name ??
+    (row.role === "TEACHER" ? "教师账号" : "未加入团队");
+
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.displayName,
+    role: row.role,
+    roleLabel: roleLabels[row.role],
+    teamLabel: primaryTeam,
+    joinedAtLabel: createdAt,
+  };
 }

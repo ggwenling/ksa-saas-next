@@ -81,3 +81,13 @@ export type TaskItem = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ProfileSummary = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "TEACHER" | "LEADER" | "MEMBER";
+  roleLabel: string;
+  teamLabel: string;
+  joinedAtLabel: string;
+};

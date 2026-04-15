@@ -3,9 +3,16 @@ import "server-only";
 import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { canPublishAnnouncement } from "@/lib/domain/announcement";
-import { presentAnnouncements, presentTeamFiles, presentTeamSummaries, presentTeacherScores } from "@/lib/dashboard/presenters";
+import {
+  presentAnnouncements,
+  presentProfile,
+  presentTeamFiles,
+  presentTeamSummaries,
+  presentTeacherScores,
+} from "@/lib/dashboard/presenters";
 import type {
   AnnouncementRow,
+  ProfileSummary,
   ScoreRow,
   TaskItem,
   TeamFileRow,
@@ -257,5 +264,38 @@ export async function getTeamBoardPageData(teamId: string): Promise<{
     teamId,
     tasks: tasks.map(serializeTask),
     members: members.map((item) => item.user),
+  };
+}
+
+export async function getProfilePageData(): Promise<{ profile: ProfileSummary }> {
+  const user = await getDashboardUser();
+
+  const row = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      role: true,
+      createdAt: true,
+      ledTeams: {
+        select: { name: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+      teams: {
+        select: {
+          team: {
+            select: { name: true },
+          },
+        },
+        orderBy: { joinedAt: "asc" },
+        take: 1,
+      },
+    },
+  });
+
+  return {
+    profile: presentProfile(row),
   };
 }

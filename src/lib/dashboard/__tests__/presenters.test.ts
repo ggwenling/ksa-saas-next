@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   presentAnnouncements,
+  presentProfile,
   presentTeamFiles,
   presentTeamSummaries,
   presentTeacherScores,
@@ -142,5 +143,45 @@ describe("presentTeamFiles", () => {
       canDelete: true,
       createdAt: "2026-04-10T10:00:00.000Z",
     });
+  });
+});
+
+describe("presentProfile", () => {
+  test("prefers led team and formats leader profile fields", () => {
+    const result = presentProfile({
+      id: "u1",
+      username: "leader01",
+      displayName: "Leader One",
+      role: "LEADER",
+      createdAt: new Date("2026-04-10T08:00:00.000Z"),
+      ledTeams: [{ name: "Seed Demo Team" }],
+      teams: [{ team: { name: "Fallback Team" } }],
+    });
+
+    expect(result).toEqual({
+      id: "u1",
+      username: "leader01",
+      displayName: "Leader One",
+      role: "LEADER",
+      roleLabel: "队长",
+      teamLabel: "Seed Demo Team",
+      joinedAtLabel: "2026-04-10",
+    });
+  });
+
+  test("uses teacher account label when teacher has no team", () => {
+    const result = presentProfile({
+      id: "u2",
+      username: "teacher01",
+      displayName: "Teacher One",
+      role: "TEACHER",
+      createdAt: "2026-04-12T09:30:00.000Z",
+      ledTeams: [],
+      teams: [],
+    });
+
+    expect(result.roleLabel).toBe("老师");
+    expect(result.teamLabel).toBe("教师账号");
+    expect(result.joinedAtLabel).toBe("2026-04-12");
   });
 });
