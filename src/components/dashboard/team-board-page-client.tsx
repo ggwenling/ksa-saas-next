@@ -1,13 +1,22 @@
 "use client";
 
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  AlertOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
+  DeleteOutlined,
+  FileTextOutlined,
+  FlagOutlined,
+  PlusOutlined,
+  ProfileOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import {
   App,
   Button,
   Card,
   Col,
   DatePicker,
-  Descriptions,
   Empty,
   Form,
   Input,
@@ -47,6 +56,63 @@ const priorityColor: Record<Exclude<TaskPriority, null>, string> = {
   中: "gold",
   低: "blue",
 };
+
+const priorityAccent: Record<Exclude<TaskPriority, null>, string> = {
+  高: "#cf4b4b",
+  中: "#c99327",
+  低: "#2d76be",
+};
+
+function TaskMetaCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/70 bg-white/62 px-4 py-4 shadow-[0_10px_24px_rgba(113,140,153,0.08)]">
+      <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span className="text-[#1d8b80]">{icon}</span>
+        <span>{label}</span>
+      </div>
+      <Typography.Text className="block text-base font-semibold text-slate-800">
+        {value}
+      </Typography.Text>
+    </div>
+  );
+}
+
+function TaskDetailSection({
+  icon,
+  title,
+  children,
+  className = "",
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card
+      size="small"
+      className={`!overflow-hidden !rounded-[28px] !border-white/70 !bg-white/60 !shadow-[0_14px_34px_rgba(108,134,148,0.08)] ${className}`}
+      title={
+        <div className="flex items-center gap-3 text-slate-800">
+          <span className="flex size-9 items-center justify-center rounded-2xl bg-[#e7f5f2] text-[#1d8b80]">
+            {icon}
+          </span>
+          <span className="text-[17px] font-semibold">{title}</span>
+        </div>
+      }
+    >
+      {children}
+    </Card>
+  );
+}
 
 export function TeamBoardPageClient({ teamId, tasks, members }: TeamBoardPageClientProps) {
   const { message } = App.useApp();
@@ -357,91 +423,242 @@ export function TeamBoardPageClient({ teamId, tasks, members }: TeamBoardPageCli
 
       <Modal
         title={
-          <div className="flex items-center gap-3">
-            <span>{selectedTask?.title}</span>
-            {selectedTask ? <Tag color="blue">{statusLabel[selectedTask.status]}</Tag> : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[#e7f5f2] text-lg text-[#1d8b80]">
+              <FileTextOutlined />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg font-semibold text-slate-900">{selectedTask?.title}</span>
+                {selectedTask ? <Tag color="blue">{statusLabel[selectedTask.status]}</Tag> : null}
+                {selectedTask?.priority ? (
+                  <Tag color={priorityColor[selectedTask.priority as Exclude<TaskPriority, null>]}>
+                    {selectedTask.priority}优先级
+                  </Tag>
+                ) : null}
+              </div>
+              <Typography.Text className="text-sm text-slate-500">
+                任务详情面板
+              </Typography.Text>
+            </div>
           </div>
         }
         open={Boolean(selectedTask)}
         onCancel={() => setSelectedTaskId(null)}
         footer={null}
-        width={780}
+        width={920}
+        styles={{
+          body: {
+            maxHeight: "78vh",
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingTop: 8,
+          },
+        }}
       >
         {selectedTask && taskDetail ? (
           <Space orientation="vertical" size={16} className="w-full">
-            <Card size="small" title="基础信息" className="!rounded-[24px] !bg-white/46">
-              <Descriptions column={2} size="small">
-                <Descriptions.Item label="负责人">{taskDetail.summary.assigneeLabel}</Descriptions.Item>
-                <Descriptions.Item label="创建人">{taskDetail.summary.creatorLabel}</Descriptions.Item>
-                <Descriptions.Item label="截止日期">{taskDetail.summary.dueDateLabel}</Descriptions.Item>
-                <Descriptions.Item label="优先级">{taskDetail.summary.priority}</Descriptions.Item>
-                <Descriptions.Item label="创建时间">{taskDetail.summary.createdAtLabel}</Descriptions.Item>
-                <Descriptions.Item label="更新时间">{taskDetail.summary.updatedAtLabel}</Descriptions.Item>
-              </Descriptions>
-            </Card>
+            <div className="relative overflow-hidden rounded-[30px] border border-white/75 bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(239,248,246,0.72))] px-5 py-5 shadow-[0_18px_40px_rgba(109,137,151,0.09)]">
+              <div className="pointer-events-none absolute right-[-8%] top-[-12%] h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(29,139,128,0.14),transparent_68%)]" />
+              <div className="pointer-events-none absolute bottom-[-16%] left-[12%] h-24 w-24 rounded-full bg-[radial-gradient(circle,rgba(194,139,44,0.14),transparent_68%)]" />
 
-            <Card size="small" title="执行情况" className="!rounded-[24px] !bg-white/46">
-              <Progress percent={taskDetail.progressPercent} strokeColor="#1d8b80" />
-              <Typography.Paragraph className="!mb-0 !mt-3 soft-text">
-                {taskDetail.progressStatus}
-              </Typography.Paragraph>
-            </Card>
-
-            <Card size="small" title="任务背景与目标" className="!rounded-[24px] !bg-white/46">
-              <Typography.Paragraph>{taskDetail.taskBackground}</Typography.Paragraph>
-              <Typography.Paragraph className="!mb-0">
-                <Typography.Text strong>任务目标：</Typography.Text>
-                {taskDetail.objective}
-              </Typography.Paragraph>
-            </Card>
-
-            <Card size="small" title="验收标准" className="!rounded-[24px] !bg-white/46">
-              <Space orientation="vertical" size={8} className="w-full">
-                {taskDetail.acceptanceCriteria.map((item, index) => (
-                  <Typography.Paragraph key={item} className="!mb-0">
-                    {index + 1}. {item}
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <Typography.Text className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
+                    Task Snapshot
+                  </Typography.Text>
+                  <Typography.Title level={4} className="!mb-0 !mt-2">
+                    {selectedTask.title}
+                  </Typography.Title>
+                  <Typography.Paragraph className="!mb-0 !mt-2 max-w-2xl soft-text">
+                    先快速掌握任务状态、负责人和关键时间，再进入目标、验收与执行细节。
                   </Typography.Paragraph>
-                ))}
-              </Space>
-            </Card>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Tag color="blue" className="!rounded-full !px-3 !py-1">
+                    {statusLabel[selectedTask.status]}
+                  </Tag>
+                  {selectedTask.priority ? (
+                    <Tag
+                      color={priorityColor[selectedTask.priority as Exclude<TaskPriority, null>]}
+                      className="!rounded-full !px-3 !py-1"
+                    >
+                      {selectedTask.priority}优先级
+                    </Tag>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <TaskMetaCard
+                  icon={<UserOutlined />}
+                  label="负责人"
+                  value={taskDetail.summary.assigneeLabel}
+                />
+                <TaskMetaCard
+                  icon={<ProfileOutlined />}
+                  label="创建人"
+                  value={taskDetail.summary.creatorLabel}
+                />
+                <TaskMetaCard
+                  icon={<CalendarOutlined />}
+                  label="截止日期"
+                  value={taskDetail.summary.dueDateLabel}
+                />
+                <TaskMetaCard
+                  icon={<FlagOutlined />}
+                  label="优先级"
+                  value={taskDetail.summary.priority}
+                />
+                <TaskMetaCard
+                  icon={<CalendarOutlined />}
+                  label="创建时间"
+                  value={taskDetail.summary.createdAtLabel}
+                />
+                <TaskMetaCard
+                  icon={<CalendarOutlined />}
+                  label="更新时间"
+                  value={taskDetail.summary.updatedAtLabel}
+                />
+              </div>
+            </div>
+
+            <TaskDetailSection icon={<CheckCircleOutlined />} title="执行情况">
+              <div className="rounded-[22px] bg-white/55 px-4 py-4">
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <Typography.Text className="text-sm font-semibold text-slate-700">
+                    当前推进状态
+                  </Typography.Text>
+                  <Typography.Text
+                    className="rounded-full px-3 py-1 text-sm font-semibold"
+                    style={{
+                      backgroundColor: `${selectedTask.priority ? priorityAccent[selectedTask.priority as Exclude<TaskPriority, null>] : "#1d8b80"}14`,
+                      color: selectedTask.priority
+                        ? priorityAccent[selectedTask.priority as Exclude<TaskPriority, null>]
+                        : "#1d8b80",
+                    }}
+                  >
+                    {taskDetail.progressPercent}%
+                  </Typography.Text>
+                </div>
+                <Progress
+                  percent={taskDetail.progressPercent}
+                  strokeColor={{
+                    "0%": "#2aa294",
+                    "100%": "#6ec8a7",
+                  }}
+                  trailColor="rgba(173, 187, 197, 0.22)"
+                />
+                <Typography.Paragraph className="!mb-0 !mt-3 leading-7 soft-text">
+                  {taskDetail.progressStatus}
+                </Typography.Paragraph>
+              </div>
+            </TaskDetailSection>
 
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <Card size="small" title="下一步动作" className="!rounded-[24px] !bg-white/46">
-                  <Space orientation="vertical" size={8} className="w-full">
-                    {taskDetail.nextActions.map((item, index) => (
-                      <Typography.Paragraph key={item} className="!mb-0">
-                        {index + 1}. {item}
-                      </Typography.Paragraph>
-                    ))}
-                  </Space>
-                </Card>
+              <Col xs={24} xl={14}>
+                <TaskDetailSection icon={<FileTextOutlined />} title="任务背景与目标" className="h-full">
+                  <Typography.Paragraph className="!mb-4 leading-8 text-slate-700">
+                    {taskDetail.taskBackground}
+                  </Typography.Paragraph>
+                  <div className="rounded-[22px] border border-white/70 bg-[#f7fbfb] px-4 py-4">
+                    <Typography.Text className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Objective
+                    </Typography.Text>
+                    <Typography.Paragraph className="!mb-0 text-[15px] leading-7 text-slate-800">
+                      {taskDetail.objective}
+                    </Typography.Paragraph>
+                  </div>
+                </TaskDetailSection>
               </Col>
-              <Col xs={24} md={12}>
-                <Card size="small" title="风险提醒" className="!rounded-[24px] !bg-white/46">
-                  <Space orientation="vertical" size={8} className="w-full">
-                    {taskDetail.risks.map((item, index) => (
-                      <Typography.Paragraph key={item} className="!mb-0">
-                        {index + 1}. {item}
-                      </Typography.Paragraph>
+              <Col xs={24} xl={10}>
+                <TaskDetailSection icon={<CheckCircleOutlined />} title="验收标准" className="h-full">
+                  <Space orientation="vertical" size={10} className="w-full">
+                    {taskDetail.acceptanceCriteria.map((item, index) => (
+                      <div
+                        key={item}
+                        className="rounded-[18px] border border-white/70 bg-white/62 px-4 py-3"
+                      >
+                        <Typography.Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#1d8b80]">
+                          Check {index + 1}
+                        </Typography.Text>
+                        <Typography.Paragraph className="!mb-0 !mt-2 leading-7 text-slate-800">
+                          {item}
+                        </Typography.Paragraph>
+                      </div>
                     ))}
                   </Space>
-                </Card>
+                </TaskDetailSection>
               </Col>
             </Row>
 
-            <Card size="small" title="输出物与协作备注" className="!rounded-[24px] !bg-white/46">
+            <Row gutter={[16, 16]}>
+              <Col xs={24} xl={12}>
+                <TaskDetailSection icon={<ProfileOutlined />} title="下一步动作" className="h-full">
+                  <Space orientation="vertical" size={10} className="w-full">
+                    {taskDetail.nextActions.map((item, index) => (
+                      <div
+                        key={item}
+                        className="rounded-[18px] border border-white/70 bg-white/62 px-4 py-3"
+                      >
+                        <Typography.Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Next {index + 1}
+                        </Typography.Text>
+                        <Typography.Paragraph className="!mb-0 !mt-2 leading-7 text-slate-800">
+                          {item}
+                        </Typography.Paragraph>
+                      </div>
+                    ))}
+                  </Space>
+                </TaskDetailSection>
+              </Col>
+              <Col xs={24} xl={12}>
+                <TaskDetailSection icon={<AlertOutlined />} title="风险提醒" className="h-full">
+                  <Space orientation="vertical" size={10} className="w-full">
+                    {taskDetail.risks.map((item, index) => (
+                      <div
+                        key={item}
+                        className="rounded-[18px] border border-[rgba(194,139,44,0.18)] bg-[rgba(255,249,240,0.78)] px-4 py-3"
+                      >
+                        <Typography.Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#c28b2c]">
+                          Risk {index + 1}
+                        </Typography.Text>
+                        <Typography.Paragraph className="!mb-0 !mt-2 leading-7 text-slate-800">
+                          {item}
+                        </Typography.Paragraph>
+                      </div>
+                    ))}
+                  </Space>
+                </TaskDetailSection>
+              </Col>
+            </Row>
+
+            <TaskDetailSection icon={<FileTextOutlined />} title="输出物与协作备注">
               <Space orientation="vertical" size={8} className="w-full">
                 {taskDetail.deliverables.map((item, index) => (
-                  <Typography.Paragraph key={item} className="!mb-0">
-                    {index + 1}. {item}
-                  </Typography.Paragraph>
+                  <div
+                    key={item}
+                    className="rounded-[18px] border border-white/70 bg-white/62 px-4 py-3"
+                  >
+                    <Typography.Text className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Deliverable {index + 1}
+                    </Typography.Text>
+                    <Typography.Paragraph className="!mb-0 !mt-2 leading-7 text-slate-800">
+                      {item}
+                    </Typography.Paragraph>
+                  </div>
                 ))}
-                <Typography.Paragraph className="!mb-0 !mt-3 soft-text">
-                  {taskDetail.collaborationNote}
-                </Typography.Paragraph>
+                <div className="mt-2 rounded-[22px] border border-dashed border-[rgba(29,139,128,0.24)] bg-[rgba(231,245,242,0.62)] px-4 py-4">
+                  <Typography.Text className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#1d8b80]">
+                    Collaboration Note
+                  </Typography.Text>
+                  <Typography.Paragraph className="!mb-0 !mt-2 leading-7 text-slate-700">
+                    {taskDetail.collaborationNote}
+                  </Typography.Paragraph>
+                </div>
               </Space>
-            </Card>
+            </TaskDetailSection>
           </Space>
         ) : null}
       </Modal>
