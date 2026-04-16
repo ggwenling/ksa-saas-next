@@ -3,7 +3,8 @@ import { requireTeamAccess } from "@/lib/auth/team-access";
 import { requireUser } from "@/lib/auth/current-user";
 import { presentTeamFiles } from "@/lib/dashboard/presenters";
 import { prisma } from "@/lib/db/prisma";
-import { generateStoredName, saveTeamFile } from "@/lib/storage/team-files";
+import { generateStoredName } from "@/lib/storage/team-files";
+import { saveTeamFileWithCompensation } from "@/lib/storage/team-file-transactions";
 
 export const runtime = "nodejs";
 
@@ -80,23 +81,27 @@ export async function POST(request: Request, context: Params) {
 
     const storedName = generateStoredName(fileName);
     const buffer = Buffer.from(await file.arrayBuffer());
-    const pathInfo = await saveTeamFile({ teamId, storedName, data: buffer });
-
-    const created = await prisma.teamFile.create({
-      data: {
-        teamId,
-        uploaderId: auth.user.id,
-        originalName: fileName,
-        storedName,
-        mimeType: mimeType || null,
-        size: file.size,
-        relativePath: pathInfo.relativePath,
-      },
-      include: {
-        uploader: {
-          select: { id: true, displayName: true, username: true, role: true },
-        },
-      },
+    const created = await saveTeamFileWithCompensation({
+      teamId,
+      storedName,
+      data: buffer,
+      createRecord: (pathInfo) =>
+        prisma.teamFile.create({
+          data: {
+            teamId,
+            uploaderId: auth.user.id,
+            originalName: fileName,
+            storedName,
+            mimeType: mimeType || null,
+            size: file.size,
+            relativePath: pathInfo.relativePath,
+          },
+          include: {
+            uploader: {
+              select: { id: true, displayName: true, username: true, role: true },
+            },
+          },
+        }),
     });
 
     return NextResponse.json(

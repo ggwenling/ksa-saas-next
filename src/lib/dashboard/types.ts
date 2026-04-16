@@ -82,11 +82,14 @@ export type TaskItem = {
   updatedAt: string;
 };
 
-export type ProfileUser = {
+export type ProfileSummary = {
   id: string;
   username: string;
   displayName: string;
   role: "TEACHER" | "LEADER" | "MEMBER";
+  roleLabel: string;
+  teamLabel: string;
+  joinedAtLabel: string;
 };
 
 export type DashboardFieldErrors = Record<string, string[] | undefined>;

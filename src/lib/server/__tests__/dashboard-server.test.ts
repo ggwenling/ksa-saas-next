@@ -8,6 +8,9 @@ const revalidatePathMock = vi.fn();
 const requireTeamAccessMock = vi.fn();
 const prismaMock = {
   $transaction: vi.fn(),
+  user: {
+    findUniqueOrThrow: vi.fn(),
+  },
   team: {
     create: vi.fn(),
     findUnique: vi.fn(),
@@ -63,6 +66,15 @@ describe("dashboard server modules", () => {
       displayName: "张三",
       role: "LEADER",
     });
+    prismaMock.user.findUniqueOrThrow.mockResolvedValue({
+      id: "user-1",
+      username: "leader01",
+      displayName: "张三",
+      role: "LEADER",
+      createdAt: new Date("2026-04-10T08:00:00.000Z"),
+      ledTeams: [{ name: "智创小队" }],
+      teams: [],
+    });
 
     const mod = await import("../dashboard-data");
 
@@ -73,11 +85,14 @@ describe("dashboard server modules", () => {
     const result = await (mod as { getProfilePageData: () => Promise<unknown> }).getProfilePageData();
 
     expect(result).toEqual({
-      user: {
+      profile: {
         id: "user-1",
         username: "leader01",
         displayName: "张三",
         role: "LEADER",
+        roleLabel: "队长",
+        teamLabel: "智创小队",
+        joinedAtLabel: "2026-04-10",
       },
     });
   });

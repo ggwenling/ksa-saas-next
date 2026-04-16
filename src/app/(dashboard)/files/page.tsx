@@ -1,28 +1,54 @@
-import { Card, Empty, Space, Table, Tag, Typography } from "antd";
+"use client";
+
+import { Button, Card, Empty, Result, Space, Spin, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { Reveal } from "@/components/ui/reveal";
-import type { TeamSummary } from "@/lib/dashboard/types";
-import { getFilesEntryPageData } from "@/lib/server/dashboard-data";
+import { loadFilesEntryPageData, type FilesEntryPageState, type TeamCard } from "./page-state";
 
-const columns: ColumnsType<TeamSummary> = [
-  { title: "团队名称", dataIndex: "name" },
-  {
-    title: "进度",
-    render: (_, row) => <Tag color="cyan">{row.progress}%</Tag>,
-  },
-  {
-    title: "成员数",
-    dataIndex: "memberCount",
-  },
-  {
-    title: "操作",
-    render: (_, row) => <Link href={`/teams/${row.id}/files`}>进入文件管理</Link>,
-  },
-];
+export default function FilesEntryPage() {
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<TeamCard[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function FilesEntryPage() {
-  const { teams } = await getFilesEntryPageData();
+  const fetchTeams = useCallback(async () => {
+    setLoading(true);
+    const result: FilesEntryPageState = await loadFilesEntryPageData(() =>
+      fetch("/api/teams", { cache: "no-store" }),
+    );
+
+    if (result.status === "error") {
+      setError(result.message);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    setRows(result.rows);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void fetchTeams();
+  }, [fetchTeams]);
+
+  const columns: ColumnsType<TeamCard> = [
+    { title: "团队名称", dataIndex: "name" },
+    {
+      title: "进度",
+      render: (_, row) => <Tag color="cyan">{row.progress}%</Tag>,
+    },
+    {
+      title: "成员数",
+      dataIndex: "memberCount",
+    },
+    {
+      title: "操作",
+      render: (_, row) => <Link href={`/teams/${row.id}/files`}>进入文件管理</Link>,
+    },
+  ];
 
   return (
     <Space orientation="vertical" size={20} className="w-full">
@@ -38,10 +64,25 @@ export default async function FilesEntryPage() {
 
       <Reveal delay={0.05}>
         <Card className="glass-panel rounded-[30px] !border-white/70 !bg-white/55">
-          {teams.length === 0 ? (
+          {loading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Spin />
+            </div>
+          ) : error ? (
+            <Result
+              status="warning"
+              title="加载团队失败"
+              subTitle={error}
+              extra={
+                <Button type="primary" onClick={() => void fetchTeams()}>
+                  重试
+                </Button>
+              }
+            />
+          ) : rows.length === 0 ? (
             <Empty description="暂无可访问团队" />
           ) : (
-            <Table rowKey="id" dataSource={teams} columns={columns} pagination={false} />
+            <Table rowKey="id" dataSource={rows} columns={columns} pagination={false} />
           )}
         </Card>
       </Reveal>

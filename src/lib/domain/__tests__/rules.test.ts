@@ -3,6 +3,7 @@ import { announcementSchema, canPublishAnnouncement } from "../announcement";
 import { canDeleteTeamFile } from "../file";
 import { calculateTeamProgress } from "../progress";
 import { scoreSchema } from "../score";
+import { createTaskSchema, updateTaskSchema } from "../task";
 
 describe("calculateTeamProgress", () => {
   test("returns 0 when no tasks", () => {
@@ -110,5 +111,27 @@ describe("canDeleteTeamFile", () => {
       uploaderId: "u1",
     });
     expect(ok).toBe(false);
+  });
+});
+
+describe("task schemas", () => {
+  test("normalizes blank assigneeId to null when creating a task", () => {
+    const result = createTaskSchema.safeParse({
+      title: "整理竞品资料",
+      assigneeId: "   ",
+      dueDate: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.assigneeId).toBeNull();
+  });
+
+  test("normalizes blank assigneeId to null when updating a task", () => {
+    const result = updateTaskSchema.safeParse({
+      assigneeId: "",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.assigneeId).toBeNull();
   });
 });
