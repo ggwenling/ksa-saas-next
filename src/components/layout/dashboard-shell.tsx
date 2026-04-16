@@ -22,6 +22,41 @@ const menuItems: ItemType[] = [
   { key: "/profile", icon: <UserOutlined />, label: "个人中心" },
 ];
 
+type LogoutResult = {
+  type: "success" | "error";
+  message: string;
+  shouldRedirect: boolean;
+};
+
+export function getDashboardSelectedKey(pathname: string): string[] {
+  if (pathname === "/files") {
+    return ["/files"];
+  }
+
+  const matched = menuItems.find((item) => {
+    const key = String(item?.key);
+    return pathname === key || pathname.startsWith(`${key}/`);
+  });
+
+  return matched ? [String(matched.key)] : ["/teams"];
+}
+
+export function getLogoutResult(ok: boolean): LogoutResult {
+  if (ok) {
+    return {
+      type: "success",
+      message: "已退出登录",
+      shouldRedirect: true,
+    };
+  }
+
+  return {
+    type: "error",
+    message: "退出失败，请稍后重试",
+    shouldRedirect: false,
+  };
+}
+
 type DashboardShellProps = {
   children: React.ReactNode;
 };
@@ -32,11 +67,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const router = useRouter();
   const { message } = App.useApp();
 
-  const selectedKey = useMemo(() => {
-    if (pathname.includes("/files")) return ["/files"];
-    const matched = menuItems.find((item) => pathname.startsWith(String(item?.key)));
-    return matched ? [String(matched.key)] : ["/teams"];
-  }, [pathname]);
+  const selectedKey = useMemo(() => getDashboardSelectedKey(pathname), [pathname]);
 
   return (
     <Layout className="min-h-screen bg-transparent">
@@ -116,9 +147,22 @@ export function DashboardShell({ children }: DashboardShellProps) {
                       icon={<LogoutOutlined />}
                       className="!h-11 !rounded-2xl !border-white/70 !bg-white/75 !px-5 !shadow-none"
                       onClick={async () => {
-                        await fetch("/api/auth/logout", { method: "POST" });
-                        message.success("已退出登录");
-                        router.push("/login");
+                        try {
+                          const res = await fetch("/api/auth/logout", { method: "POST" });
+                          const result = getLogoutResult(res.ok);
+
+                          if (result.type === "success") {
+                            message.success(result.message);
+                          } else {
+                            message.error(result.message);
+                          }
+
+                          if (result.shouldRedirect) {
+                            router.push("/login");
+                          }
+                        } catch {
+                          message.error("退出失败，请稍后重试");
+                        }
                       }}
                     >
                       退出

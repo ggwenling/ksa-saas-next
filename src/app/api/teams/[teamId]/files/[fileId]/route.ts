@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requireTeamAccess } from "@/lib/auth/team-access";
 import { canDeleteTeamFile } from "@/lib/domain/file";
 import { prisma } from "@/lib/db/prisma";
-import { removeTeamFile } from "@/lib/storage/team-files";
+import { deleteTeamFileWithCompensation } from "@/lib/storage/team-file-transactions";
 
 export const runtime = "nodejs";
 
@@ -49,8 +49,10 @@ export async function DELETE(_: Request, context: Params) {
       );
     }
 
-    await prisma.teamFile.delete({ where: { id: row.id } });
-    await removeTeamFile(row.relativePath);
+    await deleteTeamFileWithCompensation({
+      relativePath: row.relativePath,
+      deleteRecord: () => prisma.teamFile.delete({ where: { id: row.id } }).then(() => undefined),
+    });
 
     return NextResponse.json({ message: "删除文件成功" });
   } catch (error) {

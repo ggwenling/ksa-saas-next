@@ -1,41 +1,33 @@
 "use client";
 
-import { Card, Empty, Space, Spin, Table, Tag, Typography } from "antd";
+import { Button, Card, Empty, Result, Space, Spin, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Reveal } from "@/components/ui/reveal";
-
-type TeamCard = {
-  id: string;
-  name: string;
-  description: string | null;
-  progress: number;
-  memberCount: number;
-  inviteCode: string | null;
-};
-
-type TeamListResponse = {
-  data?: TeamCard[];
-  message?: string;
-};
+import { loadFilesEntryPageData, type FilesEntryPageState, type TeamCard } from "./page-state";
 
 export default function FilesEntryPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<TeamCard[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchTeams = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await fetch("/api/teams", { cache: "no-store" });
-      const json = (await res.json()) as TeamListResponse;
-      if (!res.ok) {
-        return;
-      }
-      setRows(json.data ?? []);
-    } finally {
+    const result: FilesEntryPageState = await loadFilesEntryPageData(() =>
+      fetch("/api/teams", { cache: "no-store" }),
+    );
+
+    if (result.status === "error") {
+      setError(result.message);
+      setRows([]);
       setLoading(false);
+      return;
     }
+
+    setRows(result.rows);
+    setError(null);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -76,6 +68,17 @@ export default function FilesEntryPage() {
             <div className="flex h-40 items-center justify-center">
               <Spin />
             </div>
+          ) : error ? (
+            <Result
+              status="warning"
+              title="加载团队失败"
+              subTitle={error}
+              extra={
+                <Button type="primary" onClick={() => void fetchTeams()}>
+                  重试
+                </Button>
+              }
+            />
           ) : rows.length === 0 ? (
             <Empty description="暂无可访问团队" />
           ) : (

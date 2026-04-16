@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage", "team-files");
@@ -36,7 +36,17 @@ export async function saveTeamFile(params: {
 
 export function getTeamFileAbsolutePath(relativePath: string): string {
   const normalized = relativePath.replace(/[\\/]+/g, path.sep);
-  return path.join(STORAGE_ROOT, normalized);
+  if (!normalized || path.isAbsolute(normalized) || normalized.includes(":")) {
+    throw new Error("Invalid team file path");
+  }
+
+  const resolved = path.resolve(STORAGE_ROOT, normalized);
+  const storageRootWithSep = `${path.resolve(STORAGE_ROOT)}${path.sep}`;
+  if (resolved !== path.resolve(STORAGE_ROOT) && !resolved.startsWith(storageRootWithSep)) {
+    throw new Error("Invalid team file path");
+  }
+
+  return resolved;
 }
 
 export async function removeTeamFile(relativePath: string): Promise<void> {
@@ -49,4 +59,39 @@ export async function removeTeamFile(relativePath: string): Promise<void> {
       throw error;
     }
   }
+}
+
+export async function prepareTeamFileRemoval(relativePath: string): Promise<{
+  commit: () => Promise<void>;
+  restore: () => Promise<void>;
+} | null> {
+  const absPath = getTeamFileAbsolutePath(relativePath);
+  const stagedPath = `${absPath}.deleting-${randomUUID()}`;
+
+  try {
+    await rename(absPath, stagedPath);
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+
+  return {
+    commit: async () => {
+      try {
+        await unlink(stagedPath);
+      } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        if (err.code !== "ENOENT") {
+          throw error;
+        }
+      }
+    },
+    restore: async () => {
+      await mkdir(path.dirname(absPath), { recursive: true });
+      await rename(stagedPath, absPath);
+    },
+  };
 }

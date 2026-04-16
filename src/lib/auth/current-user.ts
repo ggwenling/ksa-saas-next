@@ -28,12 +28,22 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
           username: true,
           displayName: true,
           role: true,
+          isActive: true,
         },
       },
     },
   });
 
-  return session?.user ?? null;
+  if (!session?.user || !session.user.isActive) {
+    return null;
+  }
+
+  return {
+    id: session.user.id,
+    username: session.user.username,
+    displayName: session.user.displayName,
+    role: session.user.role,
+  };
 }
 
 export async function requireUser() {

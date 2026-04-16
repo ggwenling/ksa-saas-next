@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     });
 
     if (!user || !user.isActive) {
-      return NextResponse.json({ message: "用户不存在或已禁用" }, { status: 404 });
+      return NextResponse.json({ message: "账号或密码错误" }, { status: 401 });
     }
 
     const matched = await comparePassword(password, user.passwordHash);
